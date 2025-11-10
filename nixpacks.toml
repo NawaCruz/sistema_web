@@ -1,0 +1,23 @@
+# nixpacks.toml
+
+[variables]
+NIXPACKS_PHP_VERSION = "8.3"
+NIXPACKS_PHP_EXTENSIONS = "pdo_mysql,openssl,mbstring,tokenizer,xml,ctype,curl,dom,fileinfo,gd"
+
+[phases.setup]
+# Fuerza PHP 8.3 durante el build
+nixPkgs = ["php83", "php83Packages.composer", "nodejs_18", "nginx", "libmysqlclient"]
+
+[phases.install]
+commands = [
+  "composer install --ignore-platform-reqs",
+  "npm ci"
+]
+
+[phases.build]
+commands = [
+  "composer install --no-dev --optimize-autoloader"
+]
+
+[start]
+cmd = "php artisan config:clear && php artisan route:clear && php artisan view:clear && php artisan migrate --force && php artisan db:seed --force && php artisan config:cache && php -S 0.0.0.0:$PORT -t public"
