@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\DetalleVentasExport;
+use Throwable;
 
 class DetalleVentaController extends Controller
 {

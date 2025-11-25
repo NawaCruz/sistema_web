@@ -68,7 +68,7 @@ class ClienteController extends Controller
         $dni = $request->query('dni');
         $cliente = \App\Models\Cliente::where('dni', $dni)->first();
 
-        if(!$cliente){
+        if (!$cliente) {
             return response()->json(['error' => 'No se encontró cliente con ese DNI'], 404);
         }
         return response()->json([

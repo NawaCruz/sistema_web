@@ -11,6 +11,8 @@ use App\Models\Compra;
 
 class DetalleCompraController extends Controller
 {
+    private const RULE_NUMERIC_MIN_ZERO = 'required|numeric|min:0';
+
     public function index(Request $request)
     {
         // Validar que existe una compra válida
@@ -20,7 +22,11 @@ class DetalleCompraController extends Controller
         }
 
         $page = (int) $request->get('page', 1);
-        $detalles = DetalleCompra::with(['producto'])->where('id_compra', $id)->orderBy('id', 'desc')->paginate(10)->appends(['id_compra' => $id]);
+        $detalles = DetalleCompra::with(['producto'])
+            ->where('id_compra', $id)
+            ->orderBy('id', 'desc')
+            ->paginate(10)
+            ->appends(['id_compra' => $id]);
         $compras = Compra::with('proveedor')->where('id', $id)->get();
         $productos = Producto::all();
 
@@ -29,7 +35,7 @@ class DetalleCompraController extends Controller
             $url = route(auth()->user()->role . '.detalleCompras.index') . "?id_compra={$id}&page={$last}";
             return redirect($url);
         }
-        
+
         if (auth()->user()->role === 'admin') {
             return view('admin.detalleCompras.index', compact('detalles', 'productos', 'compras'));
         } elseif (auth()->user()->role === 'empleado') {
@@ -45,13 +51,16 @@ class DetalleCompraController extends Controller
             'id_compra' => 'required|exists:compras,id',
             'id_producto' => 'required|exists:productos,id',
             'cantidad' => 'required|numeric|min:1',
-            'precio_unitario' => 'required|numeric|min:0',
-            'subtotal' => 'required|numeric|min:0',
+            'precio_unitario' => self::RULE_NUMERIC_MIN_ZERO,
+            'subtotal' => self::RULE_NUMERIC_MIN_ZERO,
         ]);
-        
+
         $subtotal = $request->cantidad * $request->precio_unitario;
 
-        DetalleCompra::create($request->only(['id_compra', 'id_producto', 'cantidad', 'precio_unitario', 'subtotal']));
+        $data = $request->only(['id_compra', 'id_producto', 'cantidad', 'precio_unitario']);
+        $data['subtotal'] = $subtotal;
+
+        DetalleCompra::create($data);
         if ($request->ajax()) {
             return response()->json(['message' => 'Detalle de compra creada correctamente']);
         }
@@ -70,10 +79,16 @@ class DetalleCompraController extends Controller
         $request->validate([
             'id_producto' => 'required|exists:productos,id',
             'cantidad' => 'required|numeric|min:1',
-            'precio_unitario' => 'required|numeric|min:0',
-            'subtotal' => 'required|numeric|min:0'
+            'precio_unitario' => self::RULE_NUMERIC_MIN_ZERO,
+            'subtotal' => self::RULE_NUMERIC_MIN_ZERO,
         ]);
-        DetalleCompra::findOrFail($id)->update($request->only(['id_producto', 'cantidad', 'precio_unitario', 'subtotal']));
+
+        $subtotal = $request->cantidad * $request->precio_unitario;
+
+        $data = $request->only(['id_producto', 'cantidad', 'precio_unitario']);
+        $data['subtotal'] = $subtotal;
+
+        DetalleCompra::findOrFail($id)->update($data);
         if ($request->ajax()) {
             return response()->json(['message' => 'Detalle de compra actualizado correctamente']);
         }
@@ -101,4 +116,3 @@ class DetalleCompraController extends Controller
         }
     }
 }
-

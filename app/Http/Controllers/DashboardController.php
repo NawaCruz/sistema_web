@@ -16,6 +16,8 @@ use App\Models\Caja;            // tabla: caja (ojo: singular en BD)
 
 class DashboardController extends Controller
 {
+    private const SELECT_TOTAL_BY_MONTH = "DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(total) as total";
+
     public function index()
     {
         // ===== Rango "mes actual" =====
@@ -44,22 +46,22 @@ class DashboardController extends Controller
         $utilidad = $ingresos - $egresos;
 
         // Productos en stock crítico (sin stock_minimo => umbral fijo)
-        $UMBRAL_CRITICO = 5; // cámbialo si quieres
-        $stockCritico = Producto::where('stock', '<=', $UMBRAL_CRITICO)->count();
+        $umbralCritico = 5; // cambialo si quieres
+        $stockCritico = Producto::where('stock', '<=', $umbralCritico)->count();
 
         $totalProductos = Producto::count();
         $totalClientes  = Cliente::count();
 
-        // ===== Gráfico 1: Ventas por mes (últimos 6) =====
-        $vMes = Venta::selectRaw("DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(total) as total")
-            ->groupBy('ym')->orderBy('ym','asc')->limit(6)->get();
+        // ===== Gr?fico 1: Ventas por mes (?ltimos 6) =====
+        $vMes = Venta::selectRaw(self::SELECT_TOTAL_BY_MONTH)
+            ->groupBy('ym')->orderBy('ym', 'asc')->limit(6)->get();
 
         $ventasPorMes = [
             'labels' => $vMes->map(fn($r) => Carbon::parse($r->ym.'-01')->translatedFormat('M Y')),
-            'data'   => $vMes->pluck('total')->map(fn($x)=>round((float)$x,2)),
+            'data'   => $vMes->pluck('total')->map(fn($x)=>round((float)$x, 2)),
         ];
 
-        // ===== Gráfico 2: Top 10 productos más vendidos =====
+        // ===== Gr?fico 2: Top 10 productos m?s vendidos =====
         $top = DetalleVenta::selectRaw('productos.nombre AS prod, SUM(detalle_ventas.cantidad) AS cant')
             ->join('productos', 'productos.id', '=', 'detalle_ventas.id_producto')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.id_venta')
@@ -73,32 +75,32 @@ class DashboardController extends Controller
             'data'   => $top->pluck('cant')->map(fn($x)=>(int)$x),
         ];
 
-        // ===== Gráfico 3: Stock crítico vs suficiente =====
-        $critico    = (int) Producto::where('stock','<=',$UMBRAL_CRITICO)->count();
-        $suficiente = (int) Producto::where('stock','>',$UMBRAL_CRITICO)->count();
+        // ===== Gr?fico 3: Stock cr?tico vs suficiente =====
+        $critico    = (int) Producto::where('stock' ,'<=',$umbralCritico)->count();
+        $suficiente = (int) Producto::where('stock' ,'>',$umbralCritico)->count();
         $stock = [
-            'labels' => ['Crítico/Bajo','Suficiente'],
+            'labels' => ['Cr?tico/Bajo','Suficiente'],
             'data'   => [$critico, $suficiente],
         ];
 
-        // ===== Gráfico 4: Ingresos vs Egresos (últimos 6 meses) =====
-        $ing = Venta::selectRaw("DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(total) as total")
-            ->groupBy('ym')->orderBy('ym','asc')->limit(6)->get();
-        $egr = Compra::selectRaw("DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(total) as total")
-            ->groupBy('ym')->orderBy('ym','asc')->limit(6)->get();
+        // ===== Gr?fico 4: Ingresos vs Egresos (?ltimos 6 meses) =====
+        $ing = Venta::selectRaw(self::SELECT_TOTAL_BY_MONTH)
+            ->groupBy('ym')->orderBy('ym' ,'asc')->limit(6)->get();
+        $egr = Compra::selectRaw(self::SELECT_TOTAL_BY_MONTH)
+            ->groupBy('ym')->orderBy('ym' ,'asc')->limit(6)->get();
 
         $meses = collect($ing->pluck('ym'))->merge($egr->pluck('ym'))->unique()->sort()->values();
 
         $ingEgr = [
             'labels'  => $meses->map(fn($ym)=>Carbon::parse("$ym-01")->translatedFormat('M Y')),
-            'ingresos'=> $meses->map(fn($ym)=> round((float)($ing->firstWhere('ym',$ym)->total ?? 0),2)),
-            'egresos' => $meses->map(fn($ym)=> round((float)($egr->firstWhere('ym',$ym)->total ?? 0),2)),
+            'ingresos'=> $meses->map(fn($ym)=> round((float)($ing->firstWhere('ym', $ym)->total ?? 0), 2)),
+            'egresos' => $meses->map(fn($ym)=> round((float)($egr->firstWhere('ym', $ym)->total ?? 0), 2)),
         ];
 
-        // ===== Gráfico 5: Tipos de pago (pie) =====
+        // ===== Gr?fico 5: Tipos de pago (pie) =====
         // La tabla se llama "metodos_pago". La columna de nombre puede ser "nombre" o "metodo".
         $tiposPagoRows = DB::table('ventas')
-            ->join('metodos_pago','metodos_pago.id','=','ventas.metodo_pago_id')
+            ->join('metodos_pago', 'metodos_pago.id', '=', 'ventas.metodo_pago_id')
             ->selectRaw('COALESCE(metodos_pago.nombre, metodos_pago.nombre) AS tipo, COUNT(ventas.id) AS cnt')
             ->groupBy('tipo')
             ->orderByDesc('cnt')
@@ -109,20 +111,20 @@ class DashboardController extends Controller
             'data'   => $tiposPagoRows->pluck('cnt')->map(fn($x)=>(int)$x),
         ];
 
-        // ===== Gráfico 6: Estado de cajas (barras) =====
+        // ===== Gr?fico 6: Estado de cajas (barras) =====
         // Ojo: tu tabla es 'caja' (singular). El modelo Caja debe tener protected $table = 'caja';
         $cajas = [
             'labels' => ['Abiertas','Cerradas'],
             'data'   => [
-                (int) Caja::where('estado','Abierto')->count(),
-                (int) Caja::where('estado','Cerrado')->count(),
+                (int) Caja::where('estado', 'Abierto')->count(),
+                (int) Caja::where('estado', 'Cerrado')->count(),
             ],
         ];
 
         return view('admin.dashboard.index', compact(
-            'ventasHoy','ventasMes','ingresos','egresos','utilidad',
-            'stockCritico','totalProductos','totalClientes',
-            'ventasPorMes','topProductos','stock','ingEgr','tiposPago','cajas'
+            'ventasHoy', 'ventasMes', 'ingresos', 'egresos', 'utilidad',
+            'stockCritico', 'totalProductos', 'totalClientes',
+            'ventasPorMes', 'topProductos', 'stock', 'ingEgr', 'tiposPago', 'cajas'
         ));
     }
 }

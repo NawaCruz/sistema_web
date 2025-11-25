@@ -25,11 +25,12 @@ class CajaController extends Controller
         $desdeDate = null;
         $hastaDate = null;
 
-        if ($desde !== '') {
-            try { $desdeDate = Carbon::createFromFormat('d/m/Y', $desde)->startOfDay(); } catch (Throwable $e) {}
+        if ($desde !== '' && Carbon::hasFormat($desde, 'd/m/Y')) {
+            $desdeDate = Carbon::createFromFormat('d/m/Y', $desde)->startOfDay();
         }
-        if ($hasta !== '') {
-            try { $hastaDate = Carbon::createFromFormat('d/m/Y', $hasta)->endOfDay(); } catch (Throwable $e) {}
+
+        if ($hasta !== '' && Carbon::hasFormat($hasta, 'd/m/Y')) {
+            $hastaDate = Carbon::createFromFormat('d/m/Y', $hasta)->endOfDay();
         }
 
         // 3) Query base con relaciones que necesita tu tabla
@@ -153,7 +154,7 @@ class CajaController extends Controller
         $role = auth()->user()->role ?? 'admin';
         $route = $role === 'empleado' ? 'empleado.cajas.index' : 'admin.cajas.index';
 
-        return DB::transaction(function () use ($request, $id, $data, $route) {
+        return DB::transaction(function () use ($id, $data, $route) {
 
             // 1) Releer la caja con candados: que esté abierta y sea del usuario (o ajusta a tu política)
             $caja = Caja::whereKey($id)
