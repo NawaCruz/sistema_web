@@ -72,7 +72,7 @@ class CajaController extends Controller
         // 8) Bandera para el botón "Abrir caja"
         $cajaAbierta = Caja::query()
             ->where('id_user', Auth::id())
-            ->where('estado', 'abierta')
+            ->where('estado', 'Abierta')
             ->latest('id_caja')
             ->first();
 
@@ -108,7 +108,7 @@ class CajaController extends Controller
 
             // 1) Re-chequear si ya hay caja abierta (dentro de la transacción)
             $cajaAbierta = Caja::where('id_user', $user->id)
-                ->where('estado', 'abierta')
+                ->where('estado', 'Abierta')
                 ->lockForUpdate()       // bloquea si existe; evita que otra transacción la altere en paralelo
                 ->latest('id_caja')
                 ->first();
@@ -126,7 +126,7 @@ class CajaController extends Controller
                 'id_user'        => $user->id,
                 'monto_apertura' => round($data['monto_apertura'], 2),
                 'monto_total'    => round($data['monto_apertura'], 2),
-                'estado'         => 'abierta',
+                'estado'         => 'Abierta',
                 'created_at'     => now(),
                 'updated_at'     => now(),
             ]);
@@ -158,7 +158,7 @@ class CajaController extends Controller
 
             // 1) Releer la caja con candados: que esté abierta y sea del usuario (o ajusta a tu política)
             $caja = Caja::whereKey($id)
-                ->where('estado', 'abierta')
+                ->where('estado', 'Abierta')
                 ->where('id_user', auth()->id())   // si un admin también cierra de otros: quita esta línea
                 ->lockForUpdate()
                 ->first();
@@ -174,7 +174,7 @@ class CajaController extends Controller
 
             // 3) Cerrar
             $caja->update([
-                'estado'        => 'cerrada',
+                'estado'        => 'Cerrada',
                 'monto_cierre'  => $data['monto_cierre'],
                 'diferencia'    => $diferencia,          // <-- crea la columna si la quieres
                 'fecha_cierre'  => now(),                // <-- asegúrate de tener este campo

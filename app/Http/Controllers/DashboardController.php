@@ -16,7 +16,20 @@ use App\Models\Caja;            // tabla: caja (ojo: singular en BD)
 
 class DashboardController extends Controller
 {
-    private const SELECT_TOTAL_BY_MONTH = "DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(total) as total";
+    /**
+     * Expresión SQL para agrupar totales por mes,
+     * compatible con MySQL y SQLite.
+     */
+    private function selectTotalByMonthExpression(): string
+    {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'sqlite') {
+            return "strftime('%Y-%m', created_at) as ym, SUM(total) as total";
+        }
+
+        return "DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(total) as total";
+    }
 
     public function index()
     {
@@ -52,8 +65,10 @@ class DashboardController extends Controller
         $totalProductos = Producto::count();
         $totalClientes  = Cliente::count();
 
-        // ===== Gr?fico 1: Ventas por mes (?ltimos 6) =====
-        $vMes = Venta::selectRaw(self::SELECT_TOTAL_BY_MONTH)
+        // ===== Gráfico 1: Ventas por mes (últimos 6) =====
+        $selectByMonth = $this->selectTotalByMonthExpression();
+
+        $vMes = Venta::selectRaw($selectByMonth)
             ->groupBy('ym')->orderBy('ym', 'asc')->limit(6)->get();
 
         $ventasPorMes = [
@@ -61,7 +76,7 @@ class DashboardController extends Controller
             'data'   => $vMes->pluck('total')->map(fn($x)=>round((float)$x, 2)),
         ];
 
-        // ===== Gr?fico 2: Top 10 productos m?s vendidos =====
+        // ===== Gráfico 2: Top 10 productos más vendidos =====
         $top = DetalleVenta::selectRaw('productos.nombre AS prod, SUM(detalle_ventas.cantidad) AS cant')
             ->join('productos', 'productos.id', '=', 'detalle_ventas.id_producto')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.id_venta')
@@ -75,7 +90,7 @@ class DashboardController extends Controller
             'data'   => $top->pluck('cant')->map(fn($x)=>(int)$x),
         ];
 
-        // ===== Gr?fico 3: Stock cr?tico vs suficiente =====
+        // ===== Gráfico 3: Stock crítico vs suficiente =====
         $critico    = (int) Producto::where('stock' ,'<=',$umbralCritico)->count();
         $suficiente = (int) Producto::where('stock' ,'>',$umbralCritico)->count();
         $stock = [
@@ -83,10 +98,10 @@ class DashboardController extends Controller
             'data'   => [$critico, $suficiente],
         ];
 
-        // ===== Gr?fico 4: Ingresos vs Egresos (?ltimos 6 meses) =====
-        $ing = Venta::selectRaw(self::SELECT_TOTAL_BY_MONTH)
+        // ===== Gráfico 4: Ingresos vs Egresos (últimos 6 meses) =====
+        $ing = Venta::selectRaw($selectByMonth)
             ->groupBy('ym')->orderBy('ym' ,'asc')->limit(6)->get();
-        $egr = Compra::selectRaw(self::SELECT_TOTAL_BY_MONTH)
+        $egr = Compra::selectRaw($selectByMonth)
             ->groupBy('ym')->orderBy('ym' ,'asc')->limit(6)->get();
 
         $meses = collect($ing->pluck('ym'))->merge($egr->pluck('ym'))->unique()->sort()->values();
@@ -97,7 +112,7 @@ class DashboardController extends Controller
             'egresos' => $meses->map(fn($ym)=> round((float)($egr->firstWhere('ym', $ym)->total ?? 0), 2)),
         ];
 
-        // ===== Gr?fico 5: Tipos de pago (pie) =====
+        // ===== Gráfico 5: Tipos de pago (pie) =====
         // La tabla se llama "metodos_pago". La columna de nombre puede ser "nombre" o "metodo".
         $tiposPagoRows = DB::table('ventas')
             ->join('metodos_pago', 'metodos_pago.id', '=', 'ventas.metodo_pago_id')
@@ -111,13 +126,13 @@ class DashboardController extends Controller
             'data'   => $tiposPagoRows->pluck('cnt')->map(fn($x)=>(int)$x),
         ];
 
-        // ===== Gr?fico 6: Estado de cajas (barras) =====
+        // ===== Gráfico 6: Estado de cajas (barras) =====
         // Ojo: tu tabla es 'caja' (singular). El modelo Caja debe tener protected $table = 'caja';
         $cajas = [
             'labels' => ['Abiertas','Cerradas'],
             'data'   => [
-                (int) Caja::where('estado', 'Abierto')->count(),
-                (int) Caja::where('estado', 'Cerrado')->count(),
+                (int) Caja::where('estado', 'Abierta')->count(),
+                (int) Caja::where('estado', 'Cerrada')->count(),
             ],
         ];
 

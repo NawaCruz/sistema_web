@@ -13,9 +13,9 @@ use App\Http\Controllers\CajaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FidelizacionController;
 
-// Route::get('/', function () {
-//     return view('home');
-// });
+Route::get('/', function () {
+    return view('home');
+});
 
 Route::get('/home', [HomeController::class, 'index'])->middleware('auth')->name('home');
 Auth::routes();

@@ -1,0 +1,38 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class AdminInvalidLoginTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /**
+     * Verifica que no se pueda iniciar sesión
+     * cuando las credenciales son incorrectas.
+     */
+    public function test_admin_cannot_login_with_invalid_credentials(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $response = $this->from('/login')->post('/login', [
+            'email' => $admin->email,
+            'password' => 'wrong-password',
+        ]);
+
+        // Debe redirigir de vuelta al formulario de login
+        $response->assertRedirect('/login');
+
+        // Debe registrar errores de validación en la sesión
+        $response->assertSessionHasErrors('email');
+
+        // El usuario no debe quedar autenticado
+        $this->assertGuest();
+    }
+}
+
